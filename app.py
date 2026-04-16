@@ -33,7 +33,7 @@ if cat_f != "Todas":
     df_final = df_final[df_final["Cátedra"] == cat_f]
 
 # --- VISTA PRINCIPAL ---
-st.title("📋 Base de Datos de Integrantes")
+st.title("📋 Base de Datos de Integrantes EMECU Táchira")
 st.markdown("### Información Completa del Registro")
 
 st.dataframe(df_final, use_container_width=True, height=600)
