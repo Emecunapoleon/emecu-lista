@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 
 # 1. Configuración de la página
-st.set_page_config(page_title="Lista Administrativa EMECU", layout="wide")
+st.set_page_config(page_title="Administración EMECU - Total", layout="wide")
 
 # URL de tu Google Sheet (formato CSV)
 SHEET_ID = "1r-U_9tbE4Q1OK0QllaM14yseq1T-eppb9cfrXo0lq3c"
@@ -18,82 +18,65 @@ def cargar_datos():
     except:
         return None
 
-# Estilos para asegurar legibilidad en celular (Fondo Blanco) y PC (Fondo Oscuro)
+# Estilos de contraste para legibilidad universal
 st.markdown("""
     <style>
-    .main-title {
-        color: #1E88E5;
-        text-align: center;
-        font-weight: bold;
-    }
-    /* Estilo para que las métricas se vean bien en cualquier fondo */
-    [data-testid="stMetricValue"] {
-        color: #1E88E5 !important;
-    }
+    .main-title { color: #1E88E5; text-align: center; font-weight: bold; }
+    [data-testid="stMetricValue"] { color: #1E88E5 !important; }
+    /* Ajuste para que la tabla permita scroll horizontal cómodo */
+    .stDataFrame { border: 1px solid #1E88E5; border-radius: 5px; }
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown("<h1 class='main-title'>📋 Registro Administrativo EMECU</h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='main-title'>📋 Registro Completo de la Comuna</h1>", unsafe_allow_html=True)
 
 df = cargar_datos()
 
 if df is not None:
-    # --- FILTROS ---
-    col1, col2, col3 = st.columns([1, 1, 1])
+    # --- FILTROS DE BÚSQUEDA ---
+    col1, col2 = st.columns([1, 2])
     
     with col1:
-        # CORRECCIÓN: "Catedra" sin tilde para coincidir con el Excel
+        # Filtro por Cátedra (Usando "Catedra" sin tilde)
         catedras = ["Todas"] + sorted(df["Catedra"].unique().tolist())
         cat_f = st.selectbox("Filtrar por Cátedra:", catedras)
-    
-    with col2:
-        ciudades = ["Todas"] + sorted(df["Ciudad"].unique().tolist())
-        ciu_f = st.selectbox("Filtrar por Ciudad:", ciudades)
         
-    with col3:
-        busqueda = st.text_input("🔍 Buscar Nombre o Cédula:")
+    with col2:
+        busqueda = st.text_input("🔍 Buscar por cualquier campo (Nombre, Cédula, Profesión, etc.):")
 
     # --- LÓGICA DE FILTRADO ---
     df_filtrado = df.copy()
     
     if cat_f != "Todas":
         df_filtrado = df_filtrado[df_filtrado["Catedra"] == cat_f]
-    
-    if ciu_f != "Todas":
-        df_filtrado = df_filtrado[df_filtrado["Ciudad"] == ciu_f]
         
     if busqueda:
-        df_filtrado = df_filtrado[
-            df_filtrado["Primer_Nombre"].str.contains(busqueda, case=False, na=False) | 
-            df_filtrado["Cedula_Identidad"].astype(str).str.contains(busqueda, na=False)
-        ]
+        # Buscamos en todo el DataFrame convirtiendo todo a texto
+        mask = df_filtrado.apply(lambda row: row.astype(str).str.contains(busqueda, case=False).any(), axis=1)
+        df_filtrado = df_filtrado[mask]
 
-    # --- INDICADORES ---
+    # --- MÉTRICAS ---
     st.markdown("---")
     m1, m2, m3 = st.columns(3)
-    m1.metric("Total en Lista", len(df_filtrado))
-    m2.metric("Cátedras Activas", len(df["Catedra"].unique()))
-    m3.metric("Ciudades", len(df["Ciudad"].unique()))
+    m1.metric("Registros Visibles", len(df_filtrado))
+    m2.metric("Total General", len(df))
+    m3.metric("Cátedras", len(df["Catedra"].unique()))
 
-    # --- TABLA DE DATOS ---
-    # Mostramos las columnas más importantes primero
-    columnas_visibles = [
-        "Catedra", "Cedula_Identidad", "Primer_Nombre", "Primer_Apellido", 
-        "Celular", "Ciudad", "Ocupacion_Actual"
-    ]
+    # --- TABLA DE DATOS TOTAL ---
+    st.subheader("Visualización de Datos Maestros")
+    st.info("Desliza la barra inferior de la tabla para ver todas las columnas (Salud, Aptitudes, Medios, etc.)")
     
-    # Verificamos que las columnas existan antes de mostrar
-    cols_finales = [c for c in columnas_visibles if c in df_filtrado.columns]
-    
-    st.dataframe(df_filtrado[cols_finales], use_container_width=True)
+    # Al no pasarle una lista de columnas, Streamlit mostrará las 33 columnas automáticamente
+    st.dataframe(df_filtrado, use_container_width=True)
 
-    # Botón para descargar los datos filtrados
+    # --- EXPORTACIÓN ---
+    st.markdown("---")
     csv = df_filtrado.to_csv(index=False).encode('utf-8')
     st.download_button(
-        label="📥 Descargar Lista Filtrada (CSV)",
+        label="📥 Descargar Base de Datos Completa (CSV)",
         data=csv,
-        file_name='lista_emecu_filtrada.csv',
+        file_name='censo_emecu_completo.csv',
         mime='text/csv',
     )
 else:
-    st.error("No se pudo cargar la base de datos. Verifica la conexión con Google Sheets.")
+    st.error("No se pudo conectar con la base de datos de Google Sheets.")
